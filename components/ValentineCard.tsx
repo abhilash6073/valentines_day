@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Heart, Ghost } from 'lucide-react';
+import { Cat } from 'react-kawaii';
 import Button from './Button';
 
 export default function ValentineCard() {
@@ -14,8 +15,14 @@ export default function ValentineCard() {
     const noBtnRef = useRef<HTMLButtonElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const dropZoneRef = useRef<HTMLDivElement>(null);
+    const yesBtnRef = useRef<HTMLDivElement>(null); // Ref for Yes animation container
 
     const [isMobile, setIsMobile] = useState(false);
+
+    // Emotive State
+    const [isDraggingNo, setIsDraggingNo] = useState(false);
+    const [catMood, setCatMood] = useState<'excited' | 'sad' | 'shocked' | 'ko' | 'happy'>('excited');
+    const [catRotation, setCatRotation] = useState(0);
 
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -23,6 +30,25 @@ export default function ValentineCard() {
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
+
+    // Mood Cycling Logic
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isDraggingNo) {
+            setCatMood('shocked'); // Initial shock
+            let count = 0;
+            interval = setInterval(() => {
+                count++;
+                if (count % 3 === 0) setCatMood('ko'); // Dizzy/KO
+                else if (count % 2 === 0) setCatMood('sad'); // Sad
+                else setCatMood('shocked'); // Shocked
+            }, 800);
+        } else {
+            setCatMood('excited'); // Reset to happy/excited
+            setCatRotation(0);
+        }
+        return () => clearInterval(interval);
+    }, [isDraggingNo]);
 
     const handleYesClick = () => {
         setIsYes(true);
@@ -81,6 +107,36 @@ export default function ValentineCard() {
     // or maybe on text interaction? User said "run away as soon as user drops it"
     // So we will focus on drag end.
 
+    const handleDragStart = () => {
+        setIsDraggingNo(true);
+    };
+
+    const handlePointerDown = () => {
+        setIsDraggingNo(true);
+    };
+
+    const handlePointerUp = () => {
+        setIsDraggingNo(false);
+    };
+
+    const handleDrag = (event: any, info: any) => {
+        if (!isDraggingNo) setIsDraggingNo(true);
+
+        // Update rotation based on current drag position
+        if (yesBtnRef.current) {
+            const yesRect = yesBtnRef.current.getBoundingClientRect();
+            const yesCenter = {
+                x: yesRect.left + yesRect.width / 2,
+                y: yesRect.top + yesRect.height / 2
+            };
+
+            const deltaX = info.point.x - yesCenter.x;
+            const deltaY = info.point.y - yesCenter.y;
+            const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+            setCatRotation(angle / 5); // Dampened rotation for subtle effect
+        }
+    };
+
     const handleDragEnd = (event: any, info: any, isYesBtn: boolean) => {
         if (isYesBtn) {
             // Check collision with drop zone
@@ -99,6 +155,7 @@ export default function ValentineCard() {
             }
         } else {
             // It's the No button - run away!
+            setIsDraggingNo(false);
             moveNoButton();
         }
     };
@@ -132,20 +189,33 @@ export default function ValentineCard() {
                     </div>
 
                     <div className="flex flex-col md:flex-row items-center justify-center gap-6 relative min-h-[60px]">
-                        <motion.div
-                            drag
-                            dragConstraints={containerRef}
-                            dragElastic={0.2}
-                            whileDrag={{ scale: 1.1, cursor: 'grabbing' }}
-                            onDragEnd={(e, info) => handleDragEnd(e, info, true)}
-                            className="z-50"
-                        >
-                            <Button
-                                className="w-full md:w-auto min-w-[140px] cursor-grab active:cursor-grabbing"
-                            >
-                                Yes <Heart className="inline w-5 h-5 ml-2 fill-current" />
-                            </Button>
-                        </motion.div>
+
+                        {/* YES BUTTON / CAT CONTAINER */}
+                        <div ref={yesBtnRef} className="relative z-50 min-w-[150px] flex justify-center">
+                            {isDraggingNo ? (
+                                <motion.div
+                                    animate={{ rotate: catRotation }}
+                                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                                    className="flex items-center justify-center"
+                                >
+                                    <Cat size={140} mood={catMood} color="#FDA7DC" />
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    drag
+                                    dragConstraints={containerRef}
+                                    dragElastic={0.2}
+                                    whileDrag={{ scale: 1.1, cursor: 'grabbing' }}
+                                    onDragEnd={(e, info) => handleDragEnd(e, info, true)}
+                                >
+                                    <Button
+                                        className="w-full md:w-auto min-w-[140px] cursor-grab active:cursor-grabbing"
+                                    >
+                                        Yes <Heart className="inline w-5 h-5 ml-2 fill-current" />
+                                    </Button>
+                                </motion.div>
+                            )}
+                        </div>
 
                         {noBtnPosition ? (
                             typeof document !== 'undefined' && createPortal(
@@ -155,6 +225,10 @@ export default function ValentineCard() {
                                     dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }} // Unconstrained effectively for screen
                                     dragElastic={0.2}
                                     whileDrag={{ scale: 1.1, cursor: 'grabbing' }}
+                                    onDragStart={handleDragStart}
+                                    onPointerDown={handlePointerDown}
+                                    onPointerUp={handlePointerUp}
+                                    onDrag={handleDrag}
                                     onDragEnd={(e, info) => handleDragEnd(e, info, false)}
                                     initial={{
                                         opacity: 1,
@@ -188,6 +262,10 @@ export default function ValentineCard() {
                                 dragConstraints={containerRef}
                                 dragElastic={0.2}
                                 whileDrag={{ scale: 1.1, cursor: 'grabbing' }}
+                                onDragStart={handleDragStart}
+                                onPointerDown={handlePointerDown}
+                                onPointerUp={handlePointerUp}
+                                onDrag={handleDrag}
                                 onDragEnd={(e, info) => handleDragEnd(e, info, false)}
                             >
                                 <Button
