@@ -1,0 +1,5 @@
+<?xml version='1.0' encoding='UTF-8'?><Error><Code>SignatureDoesNotMatch</Code><Message>Access denied.</Message><Details>The request signature we calculated does not match the signature you provided. Check your Google secret key and signing method.</Details><StringToSign>GET
+
+
+1771067781
+/octi-image-creation-staging/2026-02-14/11-16-16-433/image.jpeg</StringToSign></Error>
