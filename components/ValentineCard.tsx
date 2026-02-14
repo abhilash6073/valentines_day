@@ -14,6 +14,15 @@ export default function ValentineCard() {
     const noBtnRef = useRef<HTMLButtonElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     const handleYesClick = () => {
         setIsYes(true);
         confetti({
@@ -117,7 +126,7 @@ export default function ValentineCard() {
                                     transition={{
                                         type: "tween",
                                         ease: "easeOut",
-                                        duration: 1.5
+                                        duration: isMobile ? 0.4 : 1.5
                                     }}
                                     style={{ position: 'fixed', zIndex: 9999 }}
                                 >
@@ -150,11 +159,11 @@ export default function ValentineCard() {
                     animate={{ opacity: 1, scale: 1 }}
                     className="bg-white/95 backdrop-blur-xl rounded-3xl p-12 shadow-2xl border-4 border-romantic-400 max-w-lg mx-auto"
                 >
-                    <div className="w-full h-48 mb-6 relative rounded-2xl overflow-hidden">
+                    <div className="w-full mb-6 relative rounded-2xl overflow-hidden shadow-md">
                         <img
                             src="/success-image.jpeg"
                             alt="Excited Husky"
-                            className="w-full h-full object-cover"
+                            className="w-full h-auto"
                         />
                     </div>
 
