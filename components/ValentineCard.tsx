@@ -10,9 +10,10 @@ import Button from './Button';
 export default function ValentineCard() {
     const [isYes, setIsYes] = useState(false);
     const [noBtnPosition, setNoBtnPosition] = useState<{ top: number; left: number } | null>(null);
-    const [initialPos, setInitialPos] = useState<{ top: number; left: number } | null>(null);
+    const [noBtnKey, setNoBtnKey] = useState(0); // Key to force re-render/reset animation
     const noBtnRef = useRef<HTMLButtonElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const dropZoneRef = useRef<HTMLDivElement>(null);
 
     const [isMobile, setIsMobile] = useState(false);
 
@@ -36,13 +37,10 @@ export default function ValentineCard() {
     const moveNoButton = () => {
         if (!noBtnRef.current) return;
 
+        // Reset any drag transformation
+        setNoBtnKey(prev => prev + 1);
+
         const btnRect = noBtnRef.current.getBoundingClientRect();
-
-        // Capture initial position for smooth transition
-        if (!noBtnPosition) {
-            setInitialPos({ top: btnRect.top, left: btnRect.left });
-        }
-
         const width = window.innerWidth - btnRect.width;
         const height = window.innerHeight - btnRect.height;
 
@@ -53,36 +51,31 @@ export default function ValentineCard() {
         setNoBtnPosition({ left: newLeft, top: newTop });
     };
 
-    // Unified Evasion Logic (Mouse & Touch)
-    useEffect(() => {
-        const handleInteraction = (clientX: number, clientY: number) => {
-            if (isYes || !noBtnRef.current) return;
+    // simplified evasion - ONLY run away on drop for this mode as requested
+    // or maybe on text interaction? User said "run away as soon as user drops it"
+    // So we will focus on drag end.
 
-            const btnRect = noBtnRef.current.getBoundingClientRect();
-            // Trigger dodge if pointer/finger is within 2px of the button (Invisible Boundary)
+    const handleDragEnd = (event: any, info: any, isYesBtn: boolean) => {
+        if (isYesBtn) {
+            // Check collision with drop zone
+            if (dropZoneRef.current) {
+                const dropRect = dropZoneRef.current.getBoundingClientRect();
+                const point = info.point; // Absolute coordinates of pointer at end
 
-            if (
-                clientX >= btnRect.left - 2 &&
-                clientX <= btnRect.right + 2 &&
-                clientY >= btnRect.top - 2 &&
-                clientY <= btnRect.bottom + 2
-            ) {
-                moveNoButton();
+                if (
+                    point.x >= dropRect.left &&
+                    point.x <= dropRect.right &&
+                    point.y >= dropRect.top &&
+                    point.y <= dropRect.bottom
+                ) {
+                    handleYesClick();
+                }
             }
-        };
-
-        const handleMouseMove = (e: MouseEvent) => handleInteraction(e.clientX, e.clientY);
-        const handleTouchMove = (e: TouchEvent) => handleInteraction(e.touches[0].clientX, e.touches[0].clientY);
-
-        // Add listeners to window to catch movements anywhere
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('touchmove', handleTouchMove);
-
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('touchmove', handleTouchMove);
-        };
-    }, [isYes]); // Re-bind if game state changes
+        } else {
+            // It's the No button - run away!
+            moveNoButton();
+        }
+    };
 
     return (
         <div className="z-10 w-full max-w-2xl p-4 md:p-8 text-center" ref={containerRef}>
@@ -101,39 +94,62 @@ export default function ValentineCard() {
                         />
                     </div>
 
+                    {/* Drop Zone */}
+                    <div
+                        ref={dropZoneRef}
+                        className="mb-8 border-4 border-dashed border-romantic-300 rounded-2xl p-8 bg-romantic-50 flex flex-col items-center justify-center min-h-[150px]"
+                    >
+                        <Heart className="w-12 h-12 text-romantic-400 mb-2 animate-bounce" />
+                        <p className="text-romantic-600 font-bold text-lg">
+                            Drop your answer here Aida
+                        </p>
+                    </div>
+
                     <div className="flex flex-col md:flex-row items-center justify-center gap-6 relative min-h-[60px]">
-                        <Button
-                            onClick={handleYesClick}
-                            className="w-full md:w-auto min-w-[140px]"
+                        <motion.div
+                            drag
+                            dragConstraints={containerRef}
+                            dragElastic={0.2}
+                            whileDrag={{ scale: 1.1, cursor: 'grabbing' }}
+                            onDragEnd={(e, info) => handleDragEnd(e, info, true)}
+                            className="z-50"
                         >
-                            Yes <Heart className="inline w-5 h-5 ml-2 fill-current" />
-                        </Button>
+                            <Button
+                                className="w-full md:w-auto min-w-[140px] cursor-grab active:cursor-grabbing"
+                            >
+                                Yes <Heart className="inline w-5 h-5 ml-2 fill-current" />
+                            </Button>
+                        </motion.div>
 
                         {noBtnPosition ? (
                             typeof document !== 'undefined' && createPortal(
                                 <motion.div
+                                    key={noBtnKey} // Force re-mount to clear drag state
+                                    drag
+                                    dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }} // Unconstrained effectively for screen
+                                    dragElastic={0.2}
+                                    whileDrag={{ scale: 1.1, cursor: 'grabbing' }}
+                                    onDragEnd={(e, info) => handleDragEnd(e, info, false)}
                                     initial={{
-                                        opacity: 1, // Start visible
-                                        left: initialPos?.left || 0,
-                                        top: initialPos?.top || 0
+                                        opacity: 1,
+                                        left: 0, // Animate FROM 0 to target (framer motion handles layout projection usually, but portal needs explicit)
+                                        // Actually better to just animate to new pos
                                     }}
                                     animate={{
-                                        opacity: 1,
                                         left: noBtnPosition.left,
                                         top: noBtnPosition.top
                                     }}
-                                    // Slower speed, graduate deceleration (tween with easeOut)
                                     transition={{
                                         type: "tween",
                                         ease: "easeOut",
                                         duration: isMobile ? 0.4 : 1.5
                                     }}
-                                    style={{ position: 'fixed', zIndex: 9999 }}
+                                    style={{ position: 'fixed', zIndex: 9999, left: 0, top: 0 }} // Reset origin for fixed positioning
                                 >
                                     <Button
                                         variant="no"
                                         ref={noBtnRef}
-                                        className="w-auto min-w-[140px]"
+                                        className="w-auto min-w-[140px] cursor-grab active:cursor-grabbing"
                                     >
                                         No <Ghost className="inline w-5 h-5 ml-2" />
                                     </Button>
@@ -141,11 +157,17 @@ export default function ValentineCard() {
                                 document.body
                             )
                         ) : (
-                            <motion.div>
+                            <motion.div
+                                drag
+                                dragConstraints={containerRef}
+                                dragElastic={0.2}
+                                whileDrag={{ scale: 1.1, cursor: 'grabbing' }}
+                                onDragEnd={(e, info) => handleDragEnd(e, info, false)}
+                            >
                                 <Button
                                     variant="no"
                                     ref={noBtnRef}
-                                    className="w-full md:w-auto min-w-[140px]"
+                                    className="w-full md:w-auto min-w-[140px] cursor-grab active:cursor-grabbing"
                                 >
                                     No <Ghost className="inline w-5 h-5 ml-2" />
                                 </Button>
