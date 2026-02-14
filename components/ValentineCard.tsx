@@ -44,11 +44,37 @@ export default function ValentineCard() {
         const width = window.innerWidth - btnRect.width;
         const height = window.innerHeight - btnRect.height;
 
-        // Calculate random position within safe bounds (padding 20px)
-        const newLeft = Math.max(20, Math.random() * (width - 20));
-        const newTop = Math.max(20, Math.random() * (height - 20));
+        let newLeft, newTop;
+        let isOverlapping = true;
+        let attempts = 0;
 
-        setNoBtnPosition({ left: newLeft, top: newTop });
+        // Get safe zone (Drop Zone) to avoid
+        const dropZoneRect = dropZoneRef.current?.getBoundingClientRect();
+
+        while (isOverlapping && attempts < 10) {
+            newLeft = Math.max(20, Math.random() * (width - 20));
+            newTop = Math.max(20, Math.random() * (height - 20));
+
+            if (dropZoneRect) {
+                // Check if new position (approximated box) overlaps with drop zone
+                // We add margin to be safe
+                if (
+                    newLeft < dropZoneRect.right + 20 &&
+                    newLeft + btnRect.width > dropZoneRect.left - 20 &&
+                    newTop < dropZoneRect.bottom + 20 &&
+                    newTop + btnRect.height > dropZoneRect.top - 20
+                ) {
+                    isOverlapping = true;
+                } else {
+                    isOverlapping = false;
+                }
+            } else {
+                isOverlapping = false;
+            }
+            attempts++;
+        }
+
+        setNoBtnPosition({ left: newLeft!, top: newTop! });
     };
 
     // simplified evasion - ONLY run away on drop for this mode as requested
